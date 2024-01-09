@@ -6,6 +6,7 @@ import html
 import json
 from datetime import datetime
 import openai
+import re
 
 import telegram
 from telegram import (
@@ -30,7 +31,7 @@ from telegram.constants import ParseMode, ChatAction
 import config
 import database
 import openai_utils
-
+import search
 
 # setup
 db = database.Database()
@@ -46,6 +47,7 @@ HELP_MESSAGE = """Commands:
 ⚪ /settings – Show settings
 ⚪ /balance – Show balance
 ⚪ /help – Show help
+⚪ /search – Search for the necessary chat model
 
 🎨 Generate images from text prompts in <b>👩‍🎨 Artist</b> /mode
 👥 Add bot to <b>group chat</b>: /help_group_chat
@@ -147,6 +149,19 @@ async def help_handle(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     db.set_user_attribute(user_id, "last_interaction", datetime.now())
     await update.message.reply_text(HELP_MESSAGE, parse_mode=ParseMode.HTML)
+
+
+async def search_handle(update: Update, context: CallbackContext):
+    await register_user_if_not_exists(update, context, update.message.from_user)
+    user_id = update.message.from_user.id
+    db.set_user_attribute(user_id, "last_interaction", datetime.now())
+
+    if update.message.text.find(" ") == -1:
+        await update.message.reply_text("Invalid query 🔧")
+    else:
+        query = update.message.text[update.message.text.find(" ") + 1:]
+
+        await update.message.reply_text(search.search_message(query))
 
 
 async def help_group_chat_handle(update: Update, context: CallbackContext):
@@ -644,6 +659,7 @@ async def post_init(application: Application):
         BotCommand("/balance", "Show balance"),
         BotCommand("/settings", "Show settings"),
         BotCommand("/help", "Show help message"),
+        BotCommand("/search", "Search for the necessary chat model"),
     ])
 
 def run_bot() -> None:
@@ -669,6 +685,7 @@ def run_bot() -> None:
 
     application.add_handler(CommandHandler("start", start_handle, filters=user_filter))
     application.add_handler(CommandHandler("help", help_handle, filters=user_filter))
+    application.add_handler(CommandHandler("search", search_handle, filters=user_filter))
     application.add_handler(CommandHandler("help_group_chat", help_group_chat_handle, filters=user_filter))
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & user_filter, message_handle))
