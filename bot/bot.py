@@ -7,6 +7,7 @@ import json
 from typing import Tuple
 from datetime import datetime
 import openai
+import re
 
 import telegram
 from telegram import (
@@ -32,6 +33,7 @@ from telegram.constants import ParseMode, ChatAction
 import config
 import database
 import openai_utils
+import search
 from payment import handle_precheckout, handle_payment, generate_payment
 
 # setup
@@ -117,6 +119,17 @@ async def start_handle(update: Update, context: CallbackContext):
     await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
     await menu_handle(update, context)
 
+async def search_handle(update: Update, context: CallbackContext):
+    await register_user_if_not_exists(update, context, update.message.from_user)
+    user_id = update.message.from_user.id
+    db.set_user_attribute(user_id, "last_interaction", datetime.now())
+
+    if update.message.text.find(" ") == -1:
+        await update.message.reply_text("Invalid query 🔧")
+    else:
+        query = update.message.text[update.message.text.find(" ") + 1:]
+
+        await update.message.reply_text(search.search_message(query))
 
 async def retry_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
@@ -682,6 +695,18 @@ async def menu_handle(update: Update, context: CallbackContext):
   text, keyboard = get_main_menu()
   await update.message.reply_html(text, reply_markup=keyboard)
 
+
+async def post_init(application: Application):
+    await application.bot.set_my_commands([
+        BotCommand("/new", "Start new dialog"),
+        BotCommand("/mode", "Select chat mode"),
+        BotCommand("/retry", "Re-generate response for previous query"),
+        BotCommand("/balance", "Show balance"),
+        BotCommand("/settings", "Show settings"),
+        BotCommand("/help", "Show help message"),
+        BotCommand("/search", "Search for the necessary chat model"),
+    ])
+
 async def balance_handle(update: Update, context: CallbackContext):
   register_user_if_not_exists(update, context, update.message.from_user)
   text, keyboard = get_balance_menu(update.message.from_user.id)
@@ -718,6 +743,7 @@ def run_bot() -> None:
 
     #gpt flow handlers
     application.add_handler(CommandHandler("start", start_handle, filters=user_filter))
+    application.add_handler(CommandHandler("search", search_handle, filters=user_filter))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & user_filter, message_handle))
     application.add_handler(CommandHandler("retry", retry_handle, filters=user_filter))
     application.add_handler(CommandHandler("new", new_dialog_handle, filters=user_filter))

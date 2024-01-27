@@ -18,7 +18,7 @@ code_assistant:
 artist:
   name: 👩‍🎨 Artist
   welcome_message: 👩‍🎨 Hi, I'm <b>Artist</b>. I'll draw anything you write me (e.g. <i>Ginger cat selfie on Times Square, illustration</i>)
-
+  prompt_start: 
 english_tutor:
   name: 🇬🇧 English Tutor
   welcome_message: 🇬🇧 Hi, I'm <b>English Tutor</b>. How can I help you?
