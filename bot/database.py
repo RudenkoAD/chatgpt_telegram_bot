@@ -31,6 +31,7 @@ class Database:
         username: str = "",
         first_name: str = "",
         last_name: str = "",
+        subscription_end: datetime = datetime(1, 1, 1),
     ):
         user_dict = {
             "_id": user_id,
@@ -39,6 +40,7 @@ class Database:
             "username": username,
             "first_name": first_name,
             "last_name": last_name,
+            "subscription_end": subscription_end,
 
             "last_interaction": datetime.now(),
             "first_seen": datetime.now(),
@@ -127,3 +129,11 @@ class Database:
             {"_id": dialog_id, "user_id": user_id},
             {"$set": {"messages": dialog_messages}}
         )
+    
+    def is_user_subscribed(self, user_id: int):
+        self.check_if_user_exists(user_id, raise_exception=True)
+
+        if datetime.now() > self.get_user_attribute(user_id, "subscription_end"):
+            return True
+        else:
+            return False
