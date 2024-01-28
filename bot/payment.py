@@ -1,7 +1,7 @@
 from telegram import LabeledPrice, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 import os
-from datetime import date
+from datetime import date, datetime, timedelta
 from database import Database
 import config
 from config import donates
@@ -12,7 +12,7 @@ db = Database()
 
 async def generate_payment(update: Update, context: CallbackContext):
   update.callback_query.answer()
-  await send_payment_message(
+  await send_payment_message(#this is bad but it's ok for now, feel free to rewrite ths
     update, 
     context, 
     "Подписка на GPT Platform", 
@@ -38,10 +38,14 @@ async def handle_precheckout(update: Update, context: CallbackContext):
   ok : bool = True
   error_message: str = ""
   """check whether everything is alright here and let the user continue the purchase if so, otherwise abort"""
+  #idk what to check yet
   await pre_checkout_query.answer(ok, error_message)
   
 async def handle_payment(update: Update, context: CallbackContext) -> None:
     """Confirms the successful payment."""
-    current_tokens = db.get_user_attribute(update.effective_user.id, "n_total_tokens")
-    donate_level = update.message.successful_payment.invoice_payload
-    db.set_user_attribute(update.effective_user.id, "n_total_tokens", current_tokens + donates[donate_level]["token_amount"])
+    payload = update.message.successful_payment.invoice_payload
+    user_id = update.effective_user.id
+    if payload == "subscription":
+      db.set_user_attribute(user_id, "subscription_end", datetime.now() + timedelta(days=31))
+    else:
+      update.message.reply_text("Что-то пошло не так с обработкой вашего платежа! Пожалуйста, напишите @MrDragonlol")
