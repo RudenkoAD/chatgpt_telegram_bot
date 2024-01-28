@@ -114,7 +114,12 @@ async def start_handle(update: Update, context: CallbackContext):
     db.set_user_attribute(user_id, "last_interaction", datetime.now())
     db.start_new_dialog(user_id)
 
-    reply_text = "Hi! I'm <b>ChatGPT</b> bot implemented with OpenAI API 🤖\n\n"
+    reply_text = """Привет! 💜
+
+Я — твой помощник на основе искусственного интеллекта 🤖
+Моя задача — помочь тебе с решением повседневных задач
+
+По умолчанию используется нейросеть ChatGPT, и ты можешь просто написать свое задание или вопрос в этот чат, можно голосом :)"""
 
     await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
     await menu_handle(update, context)
@@ -180,7 +185,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
         if use_new_dialog_timeout:
             if (datetime.now() - db.get_user_attribute(user_id, "last_interaction")).seconds > config.new_dialog_timeout and len(db.get_dialog_messages(user_id)) > 0:
                 db.start_new_dialog(user_id)
-                await update.message.reply_text(f"Starting new dialog due to timeout (<b>{config.chat_modes[chat_mode]['name']}</b> mode) ✅", parse_mode=ParseMode.HTML)
+                await update.message.reply_text(f"Начинаем новый диалог из-за того что с прошлого прошло много времени✅", parse_mode=ParseMode.HTML)
         db.set_user_attribute(user_id, "last_interaction", datetime.now())
 
         # in case of CancelledError
@@ -195,14 +200,15 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
             await update.message.chat.send_action(action="typing")
 
             if _message is None or len(_message) == 0:
-                 await update.message.reply_text("🥲 You sent <b>empty message</b>. Please, try again!", parse_mode=ParseMode.HTML)
+                 await update.message.reply_text("Пришло пустое сообщение! Попробуй еще раз", parse_mode=ParseMode.HTML)
                  return
 
             dialog_messages = db.get_dialog_messages(user_id, dialog_id=None)
-            parse_mode = {
-                "html": ParseMode.HTML,
-                "markdown": ParseMode.MARKDOWN
-            }[config.chat_modes[chat_mode]["parse_mode"]]
+            parse_mode = config.chat_modes[chat_mode]["parse_mode"]
+            
+            if db.is_user_above_limt(user_id):
+              text, reply_markup = get_above_limit_answer()
+              await context.bot.edit_message_text(text, chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id, reply_markup = reply_markup, parse_mode=parse_mode)
 
             chatgpt_instance = openai_utils.ChatGPT(model=current_model)
             if config.enable_message_streaming:
@@ -391,7 +397,7 @@ async def show_chat_modes_handle(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     db.set_user_attribute(user_id, "last_interaction", datetime.now())
 
-    text, reply_markup = get_chat_mode_menu(0)
+    text, reply_markup = get_chat_mode_menu(user_id, 0)
     await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
 
@@ -409,7 +415,7 @@ async def show_chat_modes_callback_handle(update: Update, context: CallbackConte
      if page_index < 0:
          return
 
-     text, reply_markup = get_chat_mode_menu(page_index)
+     text, reply_markup = get_chat_mode_menu(user_id, page_index)
      try:
          await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
      except telegram.error.BadRequest as e:
@@ -498,28 +504,62 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
 
 async def post_init(application: Application):
     await application.bot.set_my_commands([
-        BotCommand("/new", "Start new dialog"),
-        BotCommand("/mode", "Select chat mode"),
-        BotCommand("/retry", "Re-generate response for previous query"),
-        BotCommand("/balance", "Show balance"),
-        BotCommand("/settings", "Show settings"),
-        BotCommand("/help", "Show help message"),
+        BotCommand("/new", "Начать новый диалог"),
+        BotCommand("/mode", "Выбрать режим чата"),
+        BotCommand("/retry", "Перегенерировать последний ответ бота"),
+        BotCommand("/help", "Показать справку"),
     ])
 
 
-def get_main_menu() -> Tuple[str, InlineKeyboardMarkup]:
-  text = "Main menu"
+def get_above_limit_answer():
+  text = "К сожалению, вы превысили свой лимит. Можно повторить завтра, или купить подписку"
   keyboard = []
-  keyboard.append([InlineKeyboardButton("Chat mode", callback_data="navigate|1")])
-  keyboard.append([InlineKeyboardButton("Settings", callback_data="navigate|2")])
-  keyboard.append([InlineKeyboardButton("Donate", callback_data="navigate|3")])
-  keyboard.append([InlineKeyboardButton("Balance", callback_data="navigate|4")])
+  keyboard.append([InlineKeyboardButton("Купить подписку", callback_data=f"generate_payment")])
   reply_markup = InlineKeyboardMarkup(keyboard)
+  
   return text, reply_markup
 
-def get_chat_mode_menu(page_index: int) -> Tuple[str, InlineKeyboardMarkup]:
+def get_main_menu(user_id) -> Tuple[str, InlineKeyboardMarkup]:
+  subscribtion_status = db.is_user_subscribed(user_id)
+  text_no_subscription = """💜 <b>Сменить нейросеть</b> — использовать другую нейросеть или инструмент (GPT-4, Dalle-3)
+💜 <b>Профиль</b> — узнать статус подписки (для расширенного доступа к инструментам)
+
+💜 Некоторые инструменты учитывают весь диалог. Как только захочешь перейти на новую тему или задачу — выбери в меню телеграм <b>Новый диалог</b>
+💜 Если не понравился последний результат нейросети, можно пересоздать его, выбрав в меню телеграм <b>Ответь снова</b>
+
+Без подписки тебе доступно лишь:
+❤️ 20 запросов в день к chatGPT и другим инструментам
+❤️ 3 запроса в день к GPT-4
+❤️ 1 запрос в день к Dalle-3
+При этом с подпиской все инструменты будут работать на GPT-4"""
+  
+  text_subscription = """💜 <b>Сменить нейросеть</b> — использовать другую нейросеть или инструмент (GPT-4, Dalle-3)
+💜 <b>Профиль</b> — узнать статус подписки (для расширенного доступа к инструментам)
+
+💜 Некоторые инструменты учитывают весь диалог. Как только захочешь перейти на новую тему или задачу — выбери в меню телеграм <b>Новый диалог</b>
+💜 Если не понравился последний результат нейросети, можно пересоздать его, выбрав в меню телеграм <b>Ответь снова</b>"""
+  text = text_subscription if subscribtion_status else text_no_subscription
+  
+  keyboard = []
+  keyboard.append([InlineKeyboardButton("Инструменты", callback_data="navigate|1")])
+  keyboard.append([InlineKeyboardButton("Сменить Нейросеть", callback_data="navigate|2")])
+  keyboard.append([InlineKeyboardButton("Профиль", callback_data="navigate|3")])
+  
+  reply_markup = InlineKeyboardMarkup(keyboard)
+  
+  return text, reply_markup
+
+
+def get_chat_mode_menu(user_id, page_index: int) -> Tuple[str, InlineKeyboardMarkup]:
     n_chat_modes_per_page = config.n_chat_modes_per_page
-    text = f"Select <b>chat mode</b> ({len(config.chat_modes)} modes available):"
+    subscribtion_status = db.is_user_subscribed(user_id)
+    text_subscription = """Выбери инструмент из списка ниже (можно листать), либо введи запрос текстом — и я подберу тебе подходящую нейросеть 🔎"""
+    text_no_subscription = """Выбери инструмент из списка ниже, либо введи запрос текстом — и я подберу тебе подходящую нейросеть 🔎
+
+Без подписки тебе доступны лишь инструменты не отмеченные красным, с ограниченным числом запросов
+
+Чтобы узнать ограничения, выбери <b>Профиль</b> в меню телеграм"""
+    text = text_subscription if subscribtion_status else text_no_subscription
 
     # buttons
     chat_mode_keys = list(config.chat_modes.keys())
@@ -553,6 +593,7 @@ def get_chat_mode_menu(page_index: int) -> Tuple[str, InlineKeyboardMarkup]:
 
     return text, reply_markup
 
+
 def get_settings_menu(user_id: int) -> Tuple[str, InlineKeyboardMarkup]:
     current_model = db.get_user_attribute(user_id, "current_model")
     text:str = config.models["info"][current_model]["description"]
@@ -571,27 +612,43 @@ def get_settings_menu(user_id: int) -> Tuple[str, InlineKeyboardMarkup]:
             title = "✅ " + title
 
         keyboard.append(
-            InlineKeyboardButton(title, callback_data=f"set_settings|{model_key}")
+            [InlineKeyboardButton(title, callback_data=f"set_settings|{model_key}")]
         )
     keyboard.append(InlineKeyboardButton("« Back", callback_data="navigate|0"))
     reply_markup = InlineKeyboardMarkup([keyboard])
 
     return text, reply_markup
 
-def get_donate_menu() -> Tuple[str, InlineKeyboardMarkup]:
-    text = f"""📦 Пакеты Токенов
-⤷ Токены можно использовать в любое время
-⤷ Полезно, когда вам требуется много токенов за раз (например, когда пишете книгу)
 
-Выберите пакет токенов:"""
-    #create a inline button for each donate level
-    keyboard = []
-    for donate in config.donates:
-        name = f"{config.donates[donate]['token_amount']} токенов | {config.donates[donate]['price']} рублей"
-        keyboard.append([InlineKeyboardButton(name, callback_data=f"generate_payment|{donate}")])
-    keyboard.append([InlineKeyboardButton("« Back", callback_data="navigate|0")])
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    return text, reply_markup
+def get_profile(user_id):
+  subscribtion_status = db.is_user_subscribed(user_id)
+  text_subscription = """💚 Подписка активна
+
+Тебе доступны все инструменты и неограниченное число запросов 💜
+
+Если возникли проблемы или есть вопросы по подписке — пиши @MrDragonlol"""
+  text_no_subscription = """❤️ Подписка отсутствует
+
+Без подписки тебе доступно лишь:
+💜 20 запросов в день к chatGPT и другим инструментам
+💜 3 запроса в день к GPT-4
+💜 1 запрос в день к Dalle-3
+
+С подпиской тебе доступно:
+💜 Неограниченно запросов к chatGPT, GPT-4, Dalle-3
+💜 Расширенный набор инструментов
+💜 Все инструменты будут работать на GPT-4, а не chatGPT
+
+Чтобы оформить подписку, нажми на блок для оплаты ниже
+Стоимость — 399 рублей в месяц
+Если возникли проблемы с оплатой, пиши @MrDragonlol"""
+  text = text_subscription if subscribtion_status else text_no_subscription
+  keyboard = []
+  keyboard.append(InlineKeyboardButton("💜Купить подписку", callback_data=""))
+  keyboard.append(InlineKeyboardButton("Назад", callback_data="navigate|0"))
+  reply_markup = InlineKeyboardMarkup([keyboard])
+  return text, reply_markup
+
 
 def get_balance_menu(user_id):
     db.set_user_attribute(user_id, "last_interaction", datetime.now())
@@ -639,17 +696,15 @@ def get_balance_menu(user_id):
     reply_markup = InlineKeyboardMarkup(keyboard)
     return text, reply_markup
 
+
 def get_help_menu():
   text = """Команды:
 ⚪ /retry – Перегенерировать последний ответ бота
 ⚪ /new – Начать новый диалог
 ⚪ /mode – Выбрать режим чата
-⚪ /settings – Показать настройки
-⚪ /balance – Показать баланс
 ⚪ /help – Показать справку
 
 🎨 Генерация изображений по текстовым подсказкам в режиме <b>👩‍🎨 Художник</b>
-👥 Добавить бота в <b>групповой чат</b>: /help_group_chat
 🎤 Вы можете отправлять <b>голосовые сообщения</b> вместо текста
 """
   keyboard = []
@@ -657,22 +712,24 @@ def get_help_menu():
   reply_markup = InlineKeyboardMarkup(keyboard)
   return text, reply_markup
   
+  
 def get_page(page_index: int, user_id: int) -> Tuple[str, InlineKeyboardMarkup]:
   if page_index == 0:
-    return get_main_menu()
+    return get_main_menu(user_id)
   elif page_index == 1:
-    text, keyboard = get_chat_mode_menu(0)
+    text, keyboard = get_chat_mode_menu(user_id, 0)
   elif page_index == 2:
     text, keyboard = get_settings_menu(user_id)
   elif page_index == 3:
-    text, keyboard = get_donate_menu()
+    text, keyboard = get_profile(user_id)
   elif page_index == 4:
     text, keyboard = get_balance_menu(user_id)
   else:
-    text, keyboard = get_main_menu()
-  return text, keyboard
-  
-async def navigation_handle(update: Update, context: CallbackContext):
+    text, keyboard = get_main_menu(user_id)
+  return text, keyboard  
+
+
+async def navigate_handle(update: Update, context: CallbackContext):
     query = update.callback_query
     user_id = query.from_user.id
     await register_user_if_not_exists(update, context, query.from_user)
@@ -690,9 +747,11 @@ async def navigation_handle(update: Update, context: CallbackContext):
         if str(e).startswith("Message is not modified"):
             pass
 
+
 async def menu_handle(update: Update, context: CallbackContext):
   register_user_if_not_exists(update, context, update.message.from_user)
-  text, keyboard = get_main_menu()
+  user_id = update.message.from_user.id
+  text, keyboard = get_main_menu(user_id)
   await update.message.reply_html(text, reply_markup=keyboard)
 
 
@@ -707,10 +766,12 @@ async def post_init(application: Application):
         BotCommand("/search", "Search for the necessary chat model"),
     ])
 
+
 async def balance_handle(update: Update, context: CallbackContext):
   register_user_if_not_exists(update, context, update.message.from_user)
   text, keyboard = get_balance_menu(update.message.from_user.id)
   await update.message.reply_html(text, reply_markup=keyboard)
+  
   
 async def help_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
@@ -719,7 +780,7 @@ async def help_handle(update: Update, context: CallbackContext):
     text, keyboard = get_help_menu()
     await update.message.reply_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
-  
+
 def run_bot() -> None:
     application = (
         ApplicationBuilder()
@@ -760,7 +821,7 @@ def run_bot() -> None:
     application.add_handler(CommandHandler("menu", menu_handle, filters=user_filter))
     application.add_handler(CommandHandler("balance", balance_handle, filters=user_filter))
     application.add_handler(CommandHandler("help", help_handle, filters=user_filter))
-    application.add_handler(CallbackQueryHandler(navigation_handle, pattern="^navigate"))
+    application.add_handler(CallbackQueryHandler(navigate_handle, pattern="^navigate"))
 
     #donate
     application.add_handler(PreCheckoutQueryHandler(handle_precheckout))

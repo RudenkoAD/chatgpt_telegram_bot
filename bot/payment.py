@@ -12,14 +12,12 @@ db = Database()
 
 async def generate_payment(update: Update, context: CallbackContext):
   update.callback_query.answer()
-  donate_level = update.callback_query.data.split("|")[1]
-  donate = donates[donate_level]
   await send_payment_message(
     update, 
     context, 
-    donate["name"], 
-    donate["description"], 
-    donate_level, 
+    "Подписка на GPT Platform", 
+    "Данная подписка позволяет вам безлимитно пользоваться GPT 3.5, а так же открывает GPT4 и множество других инструментов", 
+    "subscription", 
     donate["name"], 
     donate["price"]*100
     )
