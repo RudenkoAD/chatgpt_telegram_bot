@@ -2,10 +2,24 @@ from typing import Optional, Any
 
 import pymongo
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import config
 
+default_user_dict = {
+  "subscription_end": datetime(1, 1, 1),
+  "last_interaction": datetime.now(),
+  "first_seen": datetime.now(),
+  "current_dialog_id": None,
+  "current_chat_mode": "assistant",
+  "current_model": config.models["available_text_models"][0],
+  "token_history": {},
+  "n_used_tokens": {},
+  "n_generated_images": 0,
+  "n_transcribed_seconds": 0.0,  # voice message transcription
+  "n_total_tokens": 100
+  }
+  
 
 class Database:
     def __init__(self):
@@ -49,6 +63,7 @@ class Database:
             "current_chat_mode": "assistant",
             "current_model": config.models["available_text_models"][0],
 
+            "token_history": {},
             "n_used_tokens": {},
 
             "n_generated_images": 0,
@@ -88,7 +103,8 @@ class Database:
         user_dict = self.user_collection.find_one({"_id": user_id})
 
         if key not in user_dict:
-            return None
+          self.set_user_attribute(user_id, key, default_user_dict[key])
+          return default_user_dict[key]
 
         return user_dict[key]
 
@@ -96,7 +112,31 @@ class Database:
         self.check_if_user_exists(user_id, raise_exception=True)
         self.user_collection.update_one({"_id": user_id}, {"$set": {key: value}})
 
+    def update_token_history(self, user_id: int, model: str, n_tokens: int):
+        token_history_dict = self.get_user_attribute(user_id, "token_history")
+        #current timestamp
+        timestamp = datetime.now()
+        year = str(timestamp.year)
+        month = str(timestamp.month)
+        day = str(timestamp.day)
+        time = str(timestamp.time())
+        token_history_dict[model] = token_history_dict.get(model, {})
+        token_history_dict[model][year] = token_history_dict[model].get(year, {})
+        token_history_dict[model][year][month] = token_history_dict[model][year].get(month, {})
+        token_history_dict[model][year][month][day] = token_history_dict[model][year][month].get(day, {})
+        token_history_dict[model][year][month][day][time] = token_history_dict[model][year][month][day].get(time, 0) + n_tokens
+        self.set_user_attribute(user_id, "token_history", token_history_dict)
+
+    def get_requests_today(self, user_id: int, timestamp: datetime):
+        token_history_dict = self.get_user_attribute(user_id, "token_history")
+        year = str(timestamp.year)
+        month = str(timestamp.month)
+        day = str(timestamp.day)
+        requests_today = token_history_dict.get(year, {}).get(month, {}).get(day, {})
+        return requests_today
+    
     def update_n_used_tokens(self, user_id: int, model: str, n_input_tokens: int, n_output_tokens: int):
+        self.update_token_history(user_id, model, n_input_tokens + n_output_tokens)
         n_used_tokens_dict = self.get_user_attribute(user_id, "n_used_tokens")
 
         if model in n_used_tokens_dict:
@@ -132,8 +172,18 @@ class Database:
     
     def is_user_subscribed(self, user_id: int):
         self.check_if_user_exists(user_id, raise_exception=True)
-
-        if datetime.now() > self.get_user_attribute(user_id, "subscription_end"):
-            return True
-        else:
-            return False
+        return datetime.now() < self.get_user_attribute(user_id, "subscription_end")
+      
+    def is_user_above_limit(self, user_id: int):
+        if self.is_user_subscribed:
+          return False
+        self.check_if_user_exists(user_id, raise_exception=True)
+        #return true is the user made more than 20 requests in the current day OR if the user has spent more than 10000 tokens in the current day
+        #do this using the token_history
+        #get the current timestamp
+        timestamp = datetime.now()
+        #get the requests made in the current day from token_history
+        requests_today = self.get_requests_today(user_id, timestamp).values()
+        return (len(requests_today) > 20) or (sum(requests_today) > 100000)
+        
+        

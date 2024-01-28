@@ -206,7 +206,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
             dialog_messages = db.get_dialog_messages(user_id, dialog_id=None)
             parse_mode = config.chat_modes[chat_mode]["parse_mode"]
             
-            if db.is_user_above_limt(user_id):
+            if db.is_user_above_limit(user_id):
               text, reply_markup = get_above_limit_answer()
               await context.bot.edit_message_text(text, chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id, reply_markup = reply_markup, parse_mode=parse_mode)
 
@@ -588,7 +588,7 @@ def get_chat_mode_menu(user_id, page_index: int) -> Tuple[str, InlineKeyboardMar
                 InlineKeyboardButton("«", callback_data=f"show_chat_modes|{page_index - 1}"),
                 InlineKeyboardButton("»", callback_data=f"show_chat_modes|{page_index + 1}")
             ])
-    keyboard.append([InlineKeyboardButton("« Back", callback_data="navigate|0")])
+    keyboard.append([InlineKeyboardButton("Назад", callback_data="navigate|0")])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     return text, reply_markup
@@ -614,8 +614,8 @@ def get_settings_menu(user_id: int) -> Tuple[str, InlineKeyboardMarkup]:
         keyboard.append(
             [InlineKeyboardButton(title, callback_data=f"set_settings|{model_key}")]
         )
-    keyboard.append(InlineKeyboardButton("« Back", callback_data="navigate|0"))
-    reply_markup = InlineKeyboardMarkup([keyboard])
+    keyboard.append([InlineKeyboardButton("« Back", callback_data="navigate|0")])
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
     return text, reply_markup
 
@@ -644,9 +644,9 @@ def get_profile(user_id):
 Если возникли проблемы с оплатой, пиши @MrDragonlol"""
   text = text_subscription if subscribtion_status else text_no_subscription
   keyboard = []
-  keyboard.append(InlineKeyboardButton("💜Купить подписку", callback_data=""))
-  keyboard.append(InlineKeyboardButton("Назад", callback_data="navigate|0"))
-  reply_markup = InlineKeyboardMarkup([keyboard])
+  keyboard.append([InlineKeyboardButton("💜Купить подписку", callback_data="generate_payment")])
+  keyboard.append([InlineKeyboardButton("Назад", callback_data="navigate|0")])
+  reply_markup = InlineKeyboardMarkup(keyboard)
   return text, reply_markup
 
 

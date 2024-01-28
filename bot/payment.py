@@ -18,8 +18,8 @@ async def generate_payment(update: Update, context: CallbackContext):
     "Подписка на GPT Platform", 
     "Данная подписка позволяет вам безлимитно пользоваться GPT 3.5, а так же открывает GPT4 и множество других инструментов", 
     "subscription", 
-    donate["name"], 
-    donate["price"]*100
+    "Подписка на GPT Platform", 
+    49900
     )
 
 async def send_payment_message(update: Update, context: CallbackContext, title, description, payload, name, price):
