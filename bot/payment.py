@@ -11,7 +11,7 @@ db = Database()
 #grab donate levels from donates.yml
 
 async def generate_payment(update: Update, context: CallbackContext):
-  update.callback_query.answer()
+  await update.callback_query.answer()
   await send_payment_message(#this is bad but it's ok for now, feel free to rewrite ths
     update, 
     context, 
@@ -19,7 +19,7 @@ async def generate_payment(update: Update, context: CallbackContext):
     "Данная подписка позволяет вам безлимитно пользоваться GPT 3.5, а так же открывает GPT4 и множество других инструментов", 
     "subscription", 
     "Подписка на GPT Platform", 
-    49900
+    39900
     )
 
 async def send_payment_message(update: Update, context: CallbackContext, title, description, payload, name, price):

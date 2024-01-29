@@ -129,10 +129,12 @@ class Database:
 
     def get_requests_today(self, user_id: int, timestamp: datetime):
         token_history_dict = self.get_user_attribute(user_id, "token_history")
-        year = str(timestamp.year)
-        month = str(timestamp.month)
-        day = str(timestamp.day)
-        requests_today = token_history_dict.get(year, {}).get(month, {}).get(day, {})
+        requests_today = {}
+        for model in token_history_dict:
+          year = str(timestamp.year)
+          month = str(timestamp.month)
+          day = str(timestamp.day)
+          requests_today[model] = token_history_dict.get(year, {}).get(month, {}).get(day, {})
         return requests_today
     
     def update_n_used_tokens(self, user_id: int, model: str, n_input_tokens: int, n_output_tokens: int):
@@ -174,16 +176,17 @@ class Database:
         self.check_if_user_exists(user_id, raise_exception=True)
         return datetime.now() < self.get_user_attribute(user_id, "subscription_end")
       
-    def is_user_above_limit(self, user_id: int):
+    def is_user_above_limit(self, user_id: int, model: str):
         if self.is_user_subscribed:
           return False
         self.check_if_user_exists(user_id, raise_exception=True)
-        #return true is the user made more than 20 requests in the current day OR if the user has spent more than 10000 tokens in the current day
-        #do this using the token_history
-        #get the current timestamp
         timestamp = datetime.now()
-        #get the requests made in the current day from token_history
-        requests_today = self.get_requests_today(user_id, timestamp).values()
-        return (len(requests_today) > 20) or (sum(requests_today) > 100000)
+        requests_today = self.get_requests_today(user_id, timestamp).get(model, {})
+        if model == "gpt-3.5-turbo":
+          return (len(requests_today) > 20) or (sum(requests_today) > 500000)
+        elif model == "gpt-4":
+          return True
+        elif model == "text-davinci-003":
+          return (len(requests_today) > 1)
         
         

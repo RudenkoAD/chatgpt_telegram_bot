@@ -206,7 +206,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
             dialog_messages = db.get_dialog_messages(user_id, dialog_id=None)
             parse_mode = config.chat_modes[chat_mode]["parse_mode"]
             
-            if db.is_user_above_limit(user_id):
+            if db.is_user_above_limit(user_id, current_model):
               text, reply_markup = get_above_limit_answer()
               await context.bot.edit_message_text(text, chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id, reply_markup = reply_markup, parse_mode=parse_mode)
 
@@ -296,8 +296,8 @@ async def is_previous_message_not_answered_yet(update: Update, context: Callback
 
     user_id = update.message.from_user.id
     if user_semaphores[user_id].locked():
-        text = "⏳ Please <b>wait</b> for a reply to the previous message\n"
-        text += "Or you can /cancel it"
+        text = "⏳ Пожалуйста <b>дождитесь</b> ответа на предыдущее сообщение\n"
+        text += "Или отмените (/cancel) его"
         await update.message.reply_text(text, reply_to_message_id=update.message.id, parse_mode=ParseMode.HTML)
         return True
     else:
@@ -349,7 +349,7 @@ async def generate_image_handle(update: Update, context: CallbackContext, messag
         image_urls = await openai_utils.generate_images(message, n_images=config.return_n_generated_images, size=config.image_size)
     except openai.error.InvalidRequestError as e:
         if str(e).startswith("Your request was rejected as a result of our safety system"):
-            text = "🥲 Your request <b>doesn't comply</b> with OpenAI's usage policies.\nWhat did you write there, huh?"
+            text = "🥲 Твой запрос не соотвествовал правилам OpenAI, попробуй ещё раз"
             await update.message.reply_text(text, parse_mode=ParseMode.HTML)
             return
         else:
@@ -387,7 +387,7 @@ async def cancel_handle(update: Update, context: CallbackContext):
         task = user_tasks[user_id]
         task.cancel()
     else:
-        await update.message.reply_text("<i>Nothing to cancel...</i>", parse_mode=ParseMode.HTML)
+        await update.message.reply_text("<i>Нечего отменять...</i>", parse_mode=ParseMode.HTML)
 
 
 async def show_chat_modes_handle(update: Update, context: CallbackContext):
@@ -474,7 +474,7 @@ async def set_settings_handle(update: Update, context: CallbackContext):
 
 async def edited_message_handle(update: Update, context: CallbackContext):
     if update.edited_message.chat.type == "private":
-        text = "🥲 Unfortunately, message <b>editing</b> is not supported"
+        text = "🥲 К сожалению, изменение сообщений не поддерживается"
         await update.edited_message.reply_text(text, parse_mode=ParseMode.HTML)
 
 async def error_handle(update: Update, context: CallbackContext) -> None:
@@ -567,8 +567,10 @@ def get_chat_mode_menu(user_id, page_index: int) -> Tuple[str, InlineKeyboardMar
 
     keyboard = []
     for chat_mode_key in page_chat_mode_keys:
-        name = config.chat_modes[chat_mode_key]["name"]
-        keyboard.append([InlineKeyboardButton(name, callback_data=f"set_chat_mode|{chat_mode_key}")])
+      unlocked = db.is_user_subscribed(user_id) or config.chat_modes[chat_mode_key]["paid"]
+      emoji = "✅" if unlocked else "❌"
+      name = f"{emoji} {config.chat_modes[chat_mode_key]['name']}"
+      keyboard.append([InlineKeyboardButton(name, callback_data=f"set_chat_mode|{chat_mode_key}")])
 
     # pagination
     if len(chat_mode_keys) > n_chat_modes_per_page:
