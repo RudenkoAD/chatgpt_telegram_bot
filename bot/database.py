@@ -172,6 +172,12 @@ class Database:
             {"$set": {"messages": dialog_messages}}
         )
     
+    
+    def reset_user_attribute(self, user_id, key):
+        self.check_if_user_exists(user_id, raise_exception=True)
+        self.user_collection.update_one({"_id": user_id}, {"$set": {key: default_user_dict[key]}})
+
+    
     def is_user_subscribed(self, user_id: int):
         self.check_if_user_exists(user_id, raise_exception=True)
         return datetime.now() < self.get_user_attribute(user_id, "subscription_end")

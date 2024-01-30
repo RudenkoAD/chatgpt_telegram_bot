@@ -175,10 +175,11 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
 
     user_id = update.message.from_user.id
     chat_mode = db.get_user_attribute(user_id, "current_chat_mode")
-
     if chat_mode == "artist":
         await generate_image_handle(update, context, message=message)
         return
+    if chat_mode not in config.models.keys():
+      db.reset_user_attribute(user_id, "current_chat_mode")
 
     async def message_handle_fn():
         # new dialog timeout
