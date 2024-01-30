@@ -571,7 +571,7 @@ def get_chat_mode_menu(user_id, page_index: int) -> Tuple[str, InlineKeyboardMar
       unlocked = db.is_user_subscribed(user_id) or not config.chat_modes[chat_mode_key]["paid"]
       emoji = "✅" if unlocked else "❌"
       name = f"{emoji} {config.chat_modes[chat_mode_key]['name']}"
-      callback = f"set_chat_mode|{chat_mode_key}" if unlocked else f"show_chat_modes|{page_index}
+      callback = f"set_chat_mode|{chat_mode_key}" if unlocked else f"show_chat_modes|{page_index}"
       keyboard.append([InlineKeyboardButton(name, callback_data=callback)])
 
     # pagination
