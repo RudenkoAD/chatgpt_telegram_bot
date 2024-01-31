@@ -60,7 +60,7 @@ class Database:
             "first_seen": datetime.now(),
 
             "current_dialog_id": None,
-            "current_chat_mode": "GPT-3.5 Turbo",
+            "current_chat_mode": "assistant",
             "current_model": config.models["available_text_models"][0],
 
             "token_history": {},
