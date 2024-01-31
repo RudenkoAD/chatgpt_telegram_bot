@@ -761,13 +761,11 @@ async def menu_handle(update: Update, context: CallbackContext):
 
 async def post_init(application: Application):
     await application.bot.set_my_commands([
-        BotCommand("/new", "Start new dialog"),
-        BotCommand("/mode", "Select chat mode"),
-        BotCommand("/retry", "Re-generate response for previous query"),
-        BotCommand("/balance", "Show balance"),
-        BotCommand("/settings", "Show settings"),
-        BotCommand("/help", "Show help message"),
-        BotCommand("/search", "Search for the necessary chat model"),
+        BotCommand("/new", "Начать новый диалог"),
+        BotCommand("/retry", "Перегенерировать предыдущий ответ"),
+        BotCommand("/cancel", "/Отменить предыдущий запрос"),
+        BotCommand("/help", "Справка"),
+        BotCommand("/menu", "Открыть главное меню"),
     ])
 
 
@@ -823,7 +821,7 @@ def run_bot() -> None:
 
     #navigation
     application.add_handler(CommandHandler("menu", menu_handle, filters=user_filter))
-    application.add_handler(CommandHandler("balance", balance_handle, filters=user_filter))
+    ## application.add_handler(CommandHandler("balance", balance_handle, filters=user_filter))
     application.add_handler(CommandHandler("help", help_handle, filters=user_filter))
     application.add_handler(CallbackQueryHandler(navigate_handle, pattern="^navigate"))
 
