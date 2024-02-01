@@ -3,7 +3,7 @@ from typing import Optional, Any
 import pymongo
 import uuid
 from datetime import datetime, timedelta
-
+import logging
 import config
 
 default_user_dict = {
@@ -116,25 +116,21 @@ class Database:
         token_history_dict = self.get_user_attribute(user_id, "token_history")
         #current timestamp
         timestamp = datetime.now()
-        year = str(timestamp.year)
-        month = str(timestamp.month)
-        day = str(timestamp.day)
+        date = str(timestamp.date())
         time = str(timestamp.time())
         token_history_dict[model] = token_history_dict.get(model, {})
-        token_history_dict[model][year] = token_history_dict[model].get(year, {})
-        token_history_dict[model][year][month] = token_history_dict[model][year].get(month, {})
-        token_history_dict[model][year][month][day] = token_history_dict[model][year][month].get(day, {})
-        token_history_dict[model][year][month][day][time] = token_history_dict[model][year][month][day].get(time, 0) + n_tokens
+        token_history_dict[model][date] = token_history_dict[model].get(date, {})
+        token_history_dict[model][date][time] = token_history_dict[model][date].get(time, 0) + n_tokens
         self.set_user_attribute(user_id, "token_history", token_history_dict)
 
     def get_requests_today(self, user_id: int, timestamp: datetime):
         token_history_dict = self.get_user_attribute(user_id, "token_history")
+        logging.debug(token_history_dict)
         requests_today = {}
         for model in token_history_dict:
-          year = str(timestamp.year)
-          month = str(timestamp.month)
-          day = str(timestamp.day)
-          requests_today[model] = token_history_dict.get(year, {}).get(month, {}).get(day, {})
+          date = str(timestamp.date())
+          requests_today[model] = token_history_dict[model].get(date, {})
+        logging.debug(requests_today)
         return requests_today
     
     def update_n_used_tokens(self, user_id: int, model: str, n_input_tokens: int, n_output_tokens: int):
@@ -183,16 +179,15 @@ class Database:
         return datetime.now() < self.get_user_attribute(user_id, "subscription_end")
       
     def is_user_above_limit(self, user_id: int, model: str):
-        if self.is_user_subscribed:
+        if self.is_user_subscribed(user_id):
           return False
-        self.check_if_user_exists(user_id, raise_exception=True)
         timestamp = datetime.now()
-        requests_today = self.get_requests_today(user_id, timestamp).get(model, {})
+        requests_today = self.get_requests_today(user_id, timestamp)[model]
         if model == "gpt-3.5-turbo":
-          return (len(requests_today) > 20) or (sum(requests_today) > 500000)
+          return (len(requests_today) > 20) or (sum(requests_today.values())>20000)
         elif model == "gpt-4":
           return True
-        elif model == "text-davinci-003":
-          return (len(requests_today) > 1)
+        else: 
+          return True
         
         
