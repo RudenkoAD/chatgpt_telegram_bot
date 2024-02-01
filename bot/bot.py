@@ -210,7 +210,8 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
             if db.is_user_above_limit(user_id, current_model):
               text, reply_markup = get_above_limit_answer()
               await context.bot.edit_message_text(text, chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id, reply_markup = reply_markup, parse_mode=parse_mode)
-
+              return
+            
             chatgpt_instance = openai_utils.ChatGPT(model=current_model)
             if config.enable_message_streaming:
                 gen = chatgpt_instance.send_message_stream(_message, dialog_messages=dialog_messages, chat_mode=chat_mode)
@@ -257,7 +258,6 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
             )
 
             db.update_n_used_tokens(user_id, current_model, n_input_tokens, n_output_tokens)
-
         except asyncio.CancelledError:
             # note: intermediate token updates only work when enable_message_streaming=True (config.yml)
             db.update_n_used_tokens(user_id, current_model, n_input_tokens, n_output_tokens)
@@ -372,7 +372,7 @@ async def new_dialog_handle(update: Update, context: CallbackContext):
     db.set_user_attribute(user_id, "last_interaction", datetime.now())
 
     db.start_new_dialog(user_id)
-    await update.message.reply_text("Starting new dialog ✅")
+    await update.message.reply_text("Начинаем новый диалог ✅")
 
     chat_mode = db.get_user_attribute(user_id, "current_chat_mode")
     await update.message.reply_text(f"{config.chat_modes[chat_mode]['welcome_message']}", parse_mode=ParseMode.HTML)
