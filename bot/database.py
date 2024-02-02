@@ -186,7 +186,7 @@ class Database:
         if model == "gpt-3.5-turbo":
           return (len(requests_today) > 20) or (sum(requests_today.values())>20000)
         elif model == "gpt-4":
-          return True
+          return len(requests_today) > 3
         else: 
           return True
         
