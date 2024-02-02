@@ -182,7 +182,7 @@ class Database:
         if self.is_user_subscribed(user_id):
           return False
         timestamp = datetime.now()
-        requests_today = self.get_requests_today(user_id, timestamp)[model]
+        requests_today = self.get_requests_today(user_id, timestamp).get(model, {})
         if model == "gpt-3.5-turbo":
           return (len(requests_today) > 20) or (sum(requests_today.values())>20000)
         elif model == "gpt-4":
